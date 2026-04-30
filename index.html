@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EnvX - Environment Manager</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="rail" aria-label="Workspace navigation">
+        <div class="brand">
+          <span class="brand-mark">EX</span>
+          <div>
+            <strong>EnvX</strong>
+            <span>Environment Manager</span>
+          </div>
+        </div>
+
+        <section class="auth-panel" id="authPanel">
+          <div class="panel-heading">
+            <h1>Vault Access</h1>
+            <p>Encrypted vault, unlocked per session.</p>
+          </div>
+
+          <div class="segmented" role="tablist" aria-label="Authentication mode">
+            <button class="segment active" id="loginTab" type="button">Log in</button>
+            <button class="segment" id="registerTab" type="button">Register</button>
+          </div>
+
+          <form id="authForm" class="stack">
+            <label>
+              Email
+              <input id="emailInput" type="email" autocomplete="email" required />
+            </label>
+            <label>
+              Password
+              <input id="passwordInput" type="password" autocomplete="current-password" required minlength="8" />
+            </label>
+            <button class="primary" type="submit" id="authSubmit">Unlock Vault</button>
+            <p class="note" id="authNote">Your password decrypts your vault in this browser.</p>
+          </form>
+        </section>
+
+        <section class="workspace-panel hidden" id="workspacePanel">
+          <div class="workspace-card">
+            <span class="eyebrow">Workspace</span>
+            <strong id="workspaceName">-</strong>
+            <span id="userEmail">-</span>
+          </div>
+          <button class="ghost full" id="lockButton" type="button">Lock</button>
+        </section>
+
+        <section class="project-panel hidden" id="projectPanel">
+          <div class="section-title">
+            <h2>Projects</h2>
+            <button class="icon-button" id="addProjectButton" title="Create project" type="button">+</button>
+          </div>
+          <div class="list" id="projectList"></div>
+        </section>
+      </aside>
+
+      <main class="main">
+        <section class="empty-state" id="lockedState">
+          <div class="signal"></div>
+          <h2>Secrets stay sealed until the vault is unlocked.</h2>
+          <p>Register or log in to manage projects, variables, version history, and diffs.</p>
+        </section>
+
+        <section class="dashboard hidden" id="dashboard">
+          <header class="topbar">
+            <div>
+              <span class="eyebrow" id="projectKicker">Project</span>
+              <h1 id="projectTitle">Select a project</h1>
+            </div>
+            <div class="toolbar">
+              <button class="ghost" id="addEnvButton" type="button">New Environment</button>
+              <button class="danger" id="deleteEnvButton" type="button">Delete Environment</button>
+              <button class="danger" id="deleteProjectButton" type="button">Delete Project</button>
+            </div>
+          </header>
+
+          <nav class="env-tabs" id="envTabs" aria-label="Environments"></nav>
+
+          <section class="work-grid">
+            <article class="surface variables-surface">
+              <div class="section-title">
+                <div>
+                  <h2 id="envTitle">Variables</h2>
+                  <p id="envMeta">No environment selected</p>
+                </div>
+                <div class="button-pair">
+                  <button class="ghost compact" id="importEnvButton" type="button">Import .env</button>
+                  <button class="primary compact" id="addVariableButton" type="button">Add Variable</button>
+                  <input id="envFileInput" class="visually-hidden" type="file" />
+                </div>
+              </div>
+
+              <form class="variable-form hidden" id="variableForm">
+                <input id="keyInput" type="text" placeholder="KEY_NAME" autocomplete="off" />
+                <input id="valueInput" type="text" placeholder="value" autocomplete="off" />
+                <button class="primary compact" id="saveVariableButton" type="submit">Save</button>
+                <button class="ghost compact" id="cancelVariableButton" type="button">Cancel</button>
+              </form>
+
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Key</th>
+                      <th>Value</th>
+                      <th>Updated</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="variableRows"></tbody>
+                </table>
+              </div>
+            </article>
+
+            <aside class="side-column">
+              <article class="surface">
+                <div class="section-title">
+                  <div>
+                    <h2>Version History</h2>
+                    <p id="historyMeta">Automatic snapshots</p>
+                  </div>
+                </div>
+                <div class="history-list" id="historyList"></div>
+              </article>
+
+              <article class="surface">
+                <div class="section-title">
+                  <div>
+                    <h2>Diff</h2>
+                    <p>Versions or environments</p>
+                  </div>
+                </div>
+                <div class="diff-controls">
+                  <select id="diffType">
+                    <option value="versions">Version to version</option>
+                    <option value="environments">Environment to environment</option>
+                  </select>
+                  <select id="diffLeft"></select>
+                  <select id="diffRight"></select>
+                  <button class="primary compact" id="runDiffButton" type="button">Compare</button>
+                </div>
+                <div class="diff-result" id="diffResult"></div>
+              </article>
+            </aside>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <dialog id="promptDialog">
+      <form method="dialog" class="dialog-card">
+        <h2 id="dialogTitle">Create</h2>
+        <label>
+          Name
+          <input id="dialogInput" type="text" autocomplete="off" />
+        </label>
+        <div class="dialog-actions">
+          <button class="ghost" value="cancel" type="submit">Cancel</button>
+          <button class="primary" value="ok" type="submit">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./app.js"></script>
+  </body>
+</html>
