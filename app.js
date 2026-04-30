@@ -66,7 +66,13 @@ const elements = {
   variableRows: $("variableRows"),
   addVariableButton: $("addVariableButton"),
   importEnvButton: $("importEnvButton"),
+  exportEnvButton: $("exportEnvButton"),
   importDialog: $("importDialog"),
+  exportDialog: $("exportDialog"),
+  exportMeta: $("exportMeta"),
+  envExportOutput: $("envExportOutput"),
+  copyExportButton: $("copyExportButton"),
+  downloadEnvButton: $("downloadEnvButton"),
   chooseEnvFileButton: $("chooseEnvFileButton"),
   importEnvTextButton: $("importEnvTextButton"),
   envTextInput: $("envTextInput"),
@@ -317,7 +323,7 @@ function renderDashboard() {
 
   project?.environments.forEach((env) => {
     const tab = document.createElement("button");
-    tab.className = `env-tab ${env.id === selectedEnvironmentId ? "active" : ""}`;
+    tab.className = `env-tab ${environmentToneClass(env.name)} ${env.id === selectedEnvironmentId ? "active" : ""}`;
     tab.type = "button";
     tab.textContent = env.name;
     tab.addEventListener("click", () => {
@@ -335,6 +341,39 @@ function renderDashboard() {
   renderVariables(environment);
   renderHistory(environment);
   renderDiffSelectors();
+}
+
+function environmentToneClass(name) {
+  const normalized = name.trim().toLowerCase();
+  if (normalized === "dev") return "env-dev";
+  if (normalized === "staging") return "env-staging";
+  if (normalized === "prod") return "env-prod";
+  return "";
+}
+
+function renderExportDialog() {
+  const environment = getEnvironment();
+  const project = getProject();
+  const text = serializeEnvironment(environment);
+  elements.envExportOutput.value = text;
+  elements.exportMeta.textContent = environment
+    ? `${project?.name || "Project"} / ${environment.name} - ${Object.keys(environment.variables).length} keys`
+    : "No environment selected";
+}
+
+function serializeEnvironment(environment) {
+  return sortedVariables(environment)
+    .map(([key, entry]) => `${key}=${formatEnvValue(entry.value)}`)
+    .join("\n");
+}
+
+function formatEnvValue(value) {
+  const stringValue = String(value ?? "");
+  if (!stringValue) return "";
+  if (/[\s#"'\\\n\r]/.test(stringValue)) {
+    return `"${stringValue.replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/"/g, '\\"')}"`;
+  }
+  return stringValue;
 }
 
 function renderVariables(environment) {
@@ -767,6 +806,28 @@ function escapeAttr(value) {
   return escapeHtml(value).replace(/`/g, "&#096;");
 }
 
+function openExportDialog() {
+  renderExportDialog();
+  elements.exportDialog.showModal();
+}
+
+function copyExportText() {
+  navigator.clipboard?.writeText(elements.envExportOutput.value);
+  toast("Export copied.");
+}
+
+function downloadEnvFile() {
+  const environment = getEnvironment();
+  if (!environment) return;
+  const blob = new Blob([elements.envExportOutput.value], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${environment.name}.env`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 elements.loginTab.addEventListener("click", () => setAuthMode("login"));
 elements.registerTab.addEventListener("click", () => setAuthMode("register"));
 elements.authForm.addEventListener("submit", handleAuth);
@@ -779,6 +840,9 @@ elements.addVariableButton.addEventListener("click", () => showVariableForm());
 elements.openHistoryButton.addEventListener("click", () => elements.historyDialog.showModal());
 elements.openDiffButton.addEventListener("click", () => elements.diffDialog.showModal());
 elements.importEnvButton.addEventListener("click", () => elements.importDialog.showModal());
+elements.exportEnvButton.addEventListener("click", openExportDialog);
+elements.copyExportButton.addEventListener("click", copyExportText);
+elements.downloadEnvButton.addEventListener("click", downloadEnvFile);
 elements.chooseEnvFileButton.addEventListener("click", () => elements.envFileInput.click());
 elements.importEnvTextButton.addEventListener("click", importPastedEnvText);
 elements.envFileInput.addEventListener("change", importEnvFile);

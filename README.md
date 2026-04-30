@@ -1,20 +1,22 @@
 # EnvX
 
-EnvX is a small browser app for managing `.env` variables across projects and environments.
+EnvX is a lightweight browser app for managing `.env` variables across projects and environments.
 
-It uses Firebase Auth for accounts and Firestore for readable workspace data.
+It uses Firebase Auth for accounts and Firestore for readable workspace data. No build step is required.
 
-## Features
+## ✨ Features
 
-- Email/password login and registration
-- Projects with `dev`, `staging`, and `prod` environments
-- Add, edit, delete, import, and copy environment variables
-- Import from a `.env` file or pasted `.env` text
-- Automatic version snapshots
-- Version restore and diff tools
-- No build step
+- 🔐 **Firebase Auth**: email/password login, registration, confirm password, logout, and session loading state.
+- 🗂️ **Projects**: create and manage multiple projects from one workspace.
+- 🌈 **Environments**: default `dev`, `staging`, and `prod` tabs with blue, orange, and red visual states.
+- 🔑 **Variables**: add, edit, delete, reveal, and copy environment variables.
+- 📥 **Import**: import variables from a `.env` file or pasted `.env` text.
+- 📤 **Export**: preview variables as `.env` text, copy them, or download an `.env` file.
+- 🕘 **Version history**: automatic snapshots on variable changes with restore support.
+- 🔍 **Diff tool**: compare versions or environments in a modal.
+- 🧩 **Zero build**: static HTML, CSS, and JavaScript.
 
-## Setup
+## 🚀 Setup
 
 1. Create a Firebase project.
 2. Enable **Authentication > Email/Password**.
@@ -26,11 +28,11 @@ cp firebase-config.example.js firebase-config.js
 ```
 
 5. Paste your Firebase web app config into `firebase-config.js`.
-6. Open `index.html` in a browser.
+6. Open `index.html` in a modern browser.
 
-`firebase-config.js` is ignored by Git so your project config is not committed.
+`firebase-config.js` is ignored by Git so your local Firebase config is not committed.
 
-## Firestore Rules
+## 🔥 Firestore Rules
 
 ```js
 rules_version = '2';
@@ -44,7 +46,7 @@ service cloud.firestore {
 }
 ```
 
-## Data Model
+## 🧱 Data Model
 
 EnvX stores each user's readable workspace document at:
 
@@ -52,8 +54,10 @@ EnvX stores each user's readable workspace document at:
 users/{uid}
 ```
 
-The document contains workspace metadata, projects, environments, variables, and version snapshots.
+That document contains workspace metadata, projects, environments, variables, and version snapshots.
 
-## Security Note
+## 🛡️ Security Note
 
 Firebase web config is public app configuration, not a password. Firestore security rules are what protect user data.
+
+This app stores variable values as readable Firestore data. Do not use it for highly sensitive production secrets unless that matches your security model.

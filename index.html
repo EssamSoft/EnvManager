@@ -103,6 +103,7 @@
                   <button class="ghost compact" id="openHistoryButton" type="button">History</button>
                   <button class="ghost compact" id="openDiffButton" type="button">Diff</button>
                   <button class="ghost compact" id="importEnvButton" type="button">Import .env</button>
+                  <button class="ghost compact" id="exportEnvButton" type="button">Export .env</button>
                   <button class="primary compact" id="addVariableButton" type="button">Add Variable</button>
                 </div>
               </div>
@@ -175,6 +176,23 @@
           <button class="primary" id="importEnvTextButton" type="button">Import Text</button>
         </div>
         <input id="envFileInput" class="visually-hidden" type="file" />
+      </form>
+    </dialog>
+
+    <dialog id="exportDialog">
+      <form method="dialog" class="dialog-card modal-card">
+        <div class="section-title">
+          <div>
+            <h2>Export .env</h2>
+            <p id="exportMeta">Current environment variables</p>
+          </div>
+          <button class="ghost compact" value="cancel" type="submit">Close</button>
+        </div>
+        <textarea id="envExportOutput" rows="10" readonly></textarea>
+        <div class="dialog-actions">
+          <button class="ghost" id="copyExportButton" type="button">Copy Text</button>
+          <button class="primary" id="downloadEnvButton" type="button">Download .env</button>
+        </div>
       </form>
     </dialog>
 

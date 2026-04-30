@@ -17,6 +17,9 @@
   --danger-bg: rgba(251, 113, 133, 0.1);
   --green: #5eead4;
   --amber: #fbbf24;
+  --orange: #fb923c;
+  --blue: #60a5fa;
+  --red: #f87171;
   --shadow: 0 18px 45px rgba(0, 0, 0, 0.24);
   font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
@@ -386,6 +389,39 @@ select:focus {
   min-width: 108px;
   min-height: 40px;
   padding: 0 14px;
+}
+
+.env-tab.env-dev {
+  border-color: rgba(96, 165, 250, 0.5);
+  color: #bfdbfe;
+  background: rgba(96, 165, 250, 0.09);
+}
+
+.env-tab.env-dev.active {
+  border-color: var(--blue);
+  background: rgba(96, 165, 250, 0.22);
+}
+
+.env-tab.env-staging {
+  border-color: rgba(251, 146, 60, 0.5);
+  color: #fed7aa;
+  background: rgba(251, 146, 60, 0.09);
+}
+
+.env-tab.env-staging.active {
+  border-color: var(--orange);
+  background: rgba(251, 146, 60, 0.22);
+}
+
+.env-tab.env-prod {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: #fecaca;
+  background: rgba(248, 113, 113, 0.09);
+}
+
+.env-tab.env-prod.active {
+  border-color: var(--red);
+  background: rgba(248, 113, 113, 0.22);
 }
 
 .work-grid {
