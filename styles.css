@@ -485,6 +485,12 @@ td code,
   font-family: "SFMono-Regular", Consolas, monospace;
 }
 
+.revealed-value {
+  color: var(--text);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
 .row-actions {
   display: flex;
   gap: 8px;

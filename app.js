@@ -31,6 +31,7 @@ let state = null;
 let selectedProjectId = null;
 let selectedEnvironmentId = null;
 let editingKey = null;
+const revealedKeys = new Set();
 
 const $ = (id) => document.getElementById(id);
 
@@ -384,14 +385,17 @@ function renderVariables(environment) {
   }
 
   sortedVariables(environment).forEach(([key, entry]) => {
+    const isRevealed = revealedKeys.has(revealKey(environment.id, key));
     const row = document.createElement("tr");
     row.innerHTML = `
       <td><code>${escapeHtml(key)}</code></td>
-      <td class="masked">${"•".repeat(Math.min(String(entry.value).length || 6, 24))}</td>
+      <td class="${isRevealed ? "revealed-value" : "masked"}">${
+        isRevealed ? escapeHtml(entry.value) : "•".repeat(Math.min(String(entry.value).length || 6, 24))
+      }</td>
       <td>${formatDate(entry.updatedAt)}</td>
       <td>
         <div class="row-actions">
-          <button class="tiny" data-action="reveal" data-key="${escapeAttr(key)}" type="button">Reveal</button>
+          <button class="tiny" data-action="reveal" data-key="${escapeAttr(key)}" type="button">${isRevealed ? "Hide" : "Reveal"}</button>
           <button class="tiny" data-action="edit" data-key="${escapeAttr(key)}" type="button">Edit</button>
           <button class="tiny" data-action="delete" data-key="${escapeAttr(key)}" type="button">Delete</button>
         </div>
@@ -399,6 +403,10 @@ function renderVariables(environment) {
     `;
     elements.variableRows.append(row);
   });
+}
+
+function revealKey(environmentId, key) {
+  return `${environmentId}:${key}`;
 }
 
 function renderHistory(environment) {
@@ -828,6 +836,20 @@ function downloadEnvFile() {
   URL.revokeObjectURL(url);
 }
 
+function closeDialogOnBackdropClick(dialog) {
+  dialog.addEventListener("click", (event) => {
+    if (event.target === dialog) dialog.close();
+  });
+}
+
+[
+  elements.promptDialog,
+  elements.historyDialog,
+  elements.importDialog,
+  elements.exportDialog,
+  elements.diffDialog
+].forEach(closeDialogOnBackdropClick);
+
 elements.loginTab.addEventListener("click", () => setAuthMode("login"));
 elements.registerTab.addEventListener("click", () => setAuthMode("register"));
 elements.authForm.addEventListener("submit", handleAuth);
@@ -862,9 +884,13 @@ elements.variableRows.addEventListener("click", (event) => {
   if (button.dataset.action === "delete") deleteVariable(key);
   if (button.dataset.action === "reveal") {
     const environment = getEnvironment();
-    const value = environment.variables[key]?.value || "";
-    navigator.clipboard?.writeText(value);
-    toast("Value copied to clipboard.");
+    const id = revealKey(environment.id, key);
+    if (revealedKeys.has(id)) {
+      revealedKeys.delete(id);
+    } else {
+      revealedKeys.add(id);
+    }
+    renderVariables(environment);
   }
 });
 
