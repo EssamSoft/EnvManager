@@ -20,7 +20,7 @@
         <section class="auth-panel" id="authPanel">
           <div class="panel-heading">
             <h1>Vault Access</h1>
-            <p>Encrypted vault, unlocked per session.</p>
+            <p>Firebase workspace, unlocked per session.</p>
           </div>
 
           <div class="segmented" role="tablist" aria-label="Authentication mode">
@@ -37,8 +37,12 @@
               Password
               <input id="passwordInput" type="password" autocomplete="current-password" required minlength="8" />
             </label>
+            <label class="hidden" id="confirmPasswordField">
+              Confirm Password
+              <input id="confirmPasswordInput" type="password" autocomplete="new-password" minlength="8" />
+            </label>
             <button class="primary" type="submit" id="authSubmit">Unlock Vault</button>
-            <p class="note" id="authNote">Your password decrypts your vault in this browser.</p>
+            <p class="note" id="authNote">Firebase signs you in and loads your workspace.</p>
           </form>
         </section>
 
@@ -48,7 +52,7 @@
             <strong id="workspaceName">-</strong>
             <span id="userEmail">-</span>
           </div>
-          <button class="ghost full" id="lockButton" type="button">Lock</button>
+          <button class="ghost full" id="lockButton" type="button">Logout</button>
         </section>
 
         <section class="project-panel hidden" id="projectPanel">
@@ -61,9 +65,15 @@
       </aside>
 
       <main class="main">
+        <section class="loading-state" id="loadingState">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2>Checking your session</h2>
+          <p>Loading your workspace access.</p>
+        </section>
+
         <section class="empty-state" id="lockedState">
           <div class="signal"></div>
-          <h2>Secrets stay sealed until the vault is unlocked.</h2>
+          <h2>Your workspace is ready when you sign in.</h2>
           <p>Register or log in to manage projects, variables, version history, and diffs.</p>
         </section>
 
@@ -90,9 +100,10 @@
                   <p id="envMeta">No environment selected</p>
                 </div>
                 <div class="button-pair">
+                  <button class="ghost compact" id="openHistoryButton" type="button">History</button>
+                  <button class="ghost compact" id="openDiffButton" type="button">Diff</button>
                   <button class="ghost compact" id="importEnvButton" type="button">Import .env</button>
                   <button class="primary compact" id="addVariableButton" type="button">Add Variable</button>
-                  <input id="envFileInput" class="visually-hidden" type="file" />
                 </div>
               </div>
 
@@ -117,37 +128,6 @@
                 </table>
               </div>
             </article>
-
-            <aside class="side-column">
-              <article class="surface">
-                <div class="section-title">
-                  <div>
-                    <h2>Version History</h2>
-                    <p id="historyMeta">Automatic snapshots</p>
-                  </div>
-                </div>
-                <div class="history-list" id="historyList"></div>
-              </article>
-
-              <article class="surface">
-                <div class="section-title">
-                  <div>
-                    <h2>Diff</h2>
-                    <p>Versions or environments</p>
-                  </div>
-                </div>
-                <div class="diff-controls">
-                  <select id="diffType">
-                    <option value="versions">Version to version</option>
-                    <option value="environments">Environment to environment</option>
-                  </select>
-                  <select id="diffLeft"></select>
-                  <select id="diffRight"></select>
-                  <button class="primary compact" id="runDiffButton" type="button">Compare</button>
-                </div>
-                <div class="diff-result" id="diffResult"></div>
-              </article>
-            </aside>
           </section>
         </section>
       </main>
@@ -167,7 +147,60 @@
       </form>
     </dialog>
 
+    <dialog id="historyDialog">
+      <form method="dialog" class="dialog-card modal-card">
+        <div class="section-title">
+          <div>
+            <h2>Version History</h2>
+            <p id="historyMeta">Automatic snapshots</p>
+          </div>
+          <button class="ghost compact" value="cancel" type="submit">Close</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </form>
+    </dialog>
+
+    <dialog id="importDialog">
+      <form method="dialog" class="dialog-card modal-card">
+        <div class="section-title">
+          <div>
+            <h2>Import .env</h2>
+            <p>Choose a file or paste env text.</p>
+          </div>
+          <button class="ghost compact" value="cancel" type="submit">Close</button>
+        </div>
+        <textarea id="envTextInput" rows="10" placeholder="API_URL=https://example.com&#10;API_KEY=secret"></textarea>
+        <div class="dialog-actions">
+          <button class="ghost" id="chooseEnvFileButton" type="button">Choose File</button>
+          <button class="primary" id="importEnvTextButton" type="button">Import Text</button>
+        </div>
+        <input id="envFileInput" class="visually-hidden" type="file" />
+      </form>
+    </dialog>
+
+    <dialog id="diffDialog">
+      <form method="dialog" class="dialog-card modal-card">
+        <div class="section-title">
+          <div>
+            <h2>Diff</h2>
+            <p>Versions or environments</p>
+          </div>
+          <button class="ghost compact" value="cancel" type="submit">Close</button>
+        </div>
+        <div class="diff-controls">
+          <select id="diffType">
+            <option value="versions">Version to version</option>
+            <option value="environments">Environment to environment</option>
+          </select>
+          <select id="diffLeft"></select>
+          <select id="diffRight"></select>
+          <button class="primary compact" id="runDiffButton" type="button">Compare</button>
+        </div>
+        <div class="diff-result" id="diffResult"></div>
+      </form>
+    </dialog>
+
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="./app.js"></script>
+    <script type="module" src="./app.js"></script>
   </body>
 </html>

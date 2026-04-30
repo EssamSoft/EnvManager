@@ -1,8 +1,31 @@
-const STORE_KEY = "envx.vaults";
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import { getAnalytics, isSupported } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-analytics.js";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
+import {
+  doc,
+  getDoc,
+  getFirestore,
+  setDoc
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
+
+const firebaseApp = initializeApp(firebaseConfig);
+isSupported().then((supported) => {
+  if (supported) getAnalytics(firebaseApp);
+});
+
+const auth = getAuth(firebaseApp);
+const db = getFirestore(firebaseApp);
 
 let authMode = "login";
+let authInProgress = false;
+let authChecking = true;
 let session = null;
 let state = null;
 let selectedProjectId = null;
@@ -13,6 +36,7 @@ const $ = (id) => document.getElementById(id);
 
 const elements = {
   authPanel: $("authPanel"),
+  loadingState: $("loadingState"),
   workspacePanel: $("workspacePanel"),
   projectPanel: $("projectPanel"),
   lockedState: $("lockedState"),
@@ -24,6 +48,8 @@ const elements = {
   authNote: $("authNote"),
   emailInput: $("emailInput"),
   passwordInput: $("passwordInput"),
+  confirmPasswordField: $("confirmPasswordField"),
+  confirmPasswordInput: $("confirmPasswordInput"),
   workspaceName: $("workspaceName"),
   userEmail: $("userEmail"),
   lockButton: $("lockButton"),
@@ -40,6 +66,12 @@ const elements = {
   variableRows: $("variableRows"),
   addVariableButton: $("addVariableButton"),
   importEnvButton: $("importEnvButton"),
+  importDialog: $("importDialog"),
+  chooseEnvFileButton: $("chooseEnvFileButton"),
+  importEnvTextButton: $("importEnvTextButton"),
+  envTextInput: $("envTextInput"),
+  openHistoryButton: $("openHistoryButton"),
+  openDiffButton: $("openDiffButton"),
   envFileInput: $("envFileInput"),
   variableForm: $("variableForm"),
   keyInput: $("keyInput"),
@@ -48,11 +80,13 @@ const elements = {
   cancelVariableButton: $("cancelVariableButton"),
   historyList: $("historyList"),
   historyMeta: $("historyMeta"),
+  historyDialog: $("historyDialog"),
   diffType: $("diffType"),
   diffLeft: $("diffLeft"),
   diffRight: $("diffRight"),
   runDiffButton: $("runDiffButton"),
   diffResult: $("diffResult"),
+  diffDialog: $("diffDialog"),
   promptDialog: $("promptDialog"),
   dialogTitle: $("dialogTitle"),
   dialogInput: $("dialogInput"),
@@ -61,8 +95,6 @@ const elements = {
 
 const now = () => new Date().toISOString();
 const id = () => crypto.randomUUID();
-const normalizeWorkspace = (value) => value.trim().toLowerCase().replace(/\s+/g, "-");
-const vaultId = (workspace, email) => `${normalizeWorkspace(workspace)}::${email.trim().toLowerCase()}`;
 const defaultWorkspaceName = (email) => {
   const name = email.split("@")[0].replace(/[._-]+/g, " ").trim();
   return `${name || "Personal"} Workspace`.replace(/\b\w/g, (char) => char.toUpperCase());
@@ -71,53 +103,6 @@ const formatDate = (value) => new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
   timeStyle: "short"
 }).format(new Date(value));
-
-function loadVaults() {
-  return JSON.parse(localStorage.getItem(STORE_KEY) || "{}");
-}
-
-function saveVaults(vaults) {
-  localStorage.setItem(STORE_KEY, JSON.stringify(vaults));
-}
-
-function bytesToBase64(bytes) {
-  return btoa(String.fromCharCode(...new Uint8Array(bytes)));
-}
-
-function base64ToBytes(value) {
-  return Uint8Array.from(atob(value), (char) => char.charCodeAt(0));
-}
-
-async function digestBase64(value) {
-  const hash = await crypto.subtle.digest("SHA-256", encoder.encode(value));
-  return bytesToBase64(hash);
-}
-
-async function deriveKey(password, salt) {
-  const material = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: base64ToBytes(salt), iterations: 210000, hash: "SHA-256" },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"]
-  );
-}
-
-async function encryptState(key, data) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(JSON.stringify(data)));
-  return { iv: bytesToBase64(iv), ciphertext: bytesToBase64(encrypted) };
-}
-
-async function decryptState(key, payload) {
-  const decrypted = await crypto.subtle.decrypt(
-    { name: "AES-GCM", iv: base64ToBytes(payload.iv) },
-    key,
-    base64ToBytes(payload.ciphertext)
-  );
-  return JSON.parse(decoder.decode(decrypted));
-}
 
 function initialState(workspace, email) {
   const projectId = id();
@@ -141,12 +126,33 @@ function initialState(workspace, email) {
   };
 }
 
+function userDocRef(uid = session?.uid) {
+  return doc(db, "users", uid);
+}
+
+async function loadUserState(user) {
+  const snapshot = await getDoc(userDocRef(user.uid));
+  if (!snapshot.exists()) return null;
+  const data = snapshot.data();
+  return {
+    workspace: data.workspace,
+    ownerEmail: data.ownerEmail || user.email,
+    projects: data.projects || []
+  };
+}
+
+async function saveUserState(user, nextState) {
+  await setDoc(userDocRef(user.uid), {
+    ...nextState,
+    email: user.email,
+    uid: user.uid,
+    updatedAt: now()
+  }, { merge: true });
+}
+
 async function persist(message) {
   if (!session) return;
-  const vaults = loadVaults();
-  vaults[session.vaultId].payload = await encryptState(session.key, state);
-  vaults[session.vaultId].updatedAt = now();
-  saveVaults(vaults);
+  await saveUserState(session.user, state);
   if (message) toast(message);
 }
 
@@ -182,75 +188,76 @@ function setAuthMode(mode) {
   authMode = mode;
   elements.loginTab.classList.toggle("active", mode === "login");
   elements.registerTab.classList.toggle("active", mode === "register");
+  elements.confirmPasswordField.classList.toggle("hidden", mode !== "register");
+  elements.confirmPasswordInput.required = mode === "register";
+  elements.passwordInput.autocomplete = mode === "register" ? "new-password" : "current-password";
   elements.authSubmit.textContent = mode === "login" ? "Unlock Vault" : "Create Vault";
   elements.authNote.textContent = mode === "login"
-    ? "Your password decrypts your vault in this browser."
-    : "Your personal workspace starts with dev, staging, and prod environments.";
+    ? "Firebase signs you in and loads your workspace."
+    : "Your workspace starts with dev, staging, and prod environments.";
 }
 
 async function handleAuth(event) {
   event.preventDefault();
   const email = elements.emailInput.value.trim().toLowerCase();
   const password = elements.passwordInput.value;
-  const vaults = loadVaults();
+  const confirmPassword = elements.confirmPasswordInput.value;
 
   try {
+    authInProgress = true;
+    elements.authSubmit.disabled = true;
     if (authMode === "register") {
-      if (Object.values(vaults).some((vault) => vault.email === email)) {
-        throw new Error("A vault already exists for that email.");
+      if (password !== confirmPassword) {
+        throw new Error("Passwords do not match.");
       }
-      const workspace = defaultWorkspaceName(email);
-      const keyId = vaultId(workspace, email);
-      if (vaults[keyId]) throw new Error("A vault already exists for this workspace and email.");
-      const salt = bytesToBase64(crypto.getRandomValues(new Uint8Array(16)));
-      const key = await deriveKey(password, salt);
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const workspace = defaultWorkspaceName(credential.user.email || email);
       const freshState = initialState(workspace, email);
-      vaults[keyId] = {
-        email,
-        workspace,
-        salt,
-        verifier: await digestBase64(`${keyId}:${password}`),
-        payload: await encryptState(key, freshState),
-        createdAt: now(),
-        updatedAt: now()
-      };
-      saveVaults(vaults);
-      session = { vaultId: keyId, key, email, workspace };
+      await saveUserState(credential.user, {
+        ...freshState,
+        createdAt: now()
+      });
+      session = { uid: credential.user.uid, user: credential.user, email, workspace };
       state = freshState;
     } else {
-      const unlocked = await unlockVaultByEmail(vaults, email, password);
-      if (!unlocked) throw new Error("No vault found for that email and password.");
-      session = unlocked.session;
-      state = unlocked.state;
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const loadedState = await loadUserState(credential.user);
+      if (!loadedState) throw new Error("No workspace found for this account.");
+      session = {
+        uid: credential.user.uid,
+        user: credential.user,
+        email: credential.user.email || email,
+        workspace: loadedState.workspace
+      };
+      state = loadedState;
     }
 
     selectedProjectId = state.projects[0]?.id || null;
     selectedEnvironmentId = getProject()?.environments[0]?.id || null;
     elements.authForm.reset();
     render();
-    toast("Vault unlocked.");
+    toast("Workspace loaded.");
   } catch (error) {
-    toast(error.message);
+    toast(friendlyAuthError(error));
+  } finally {
+    authInProgress = false;
+    elements.authSubmit.disabled = false;
   }
 }
 
-async function unlockVaultByEmail(vaults, email, password) {
-  const matches = Object.entries(vaults).filter(([, vault]) => vault.email === email);
-
-  for (const [keyId, vault] of matches) {
-    const verifier = await digestBase64(`${keyId}:${password}`);
-    if (verifier !== vault.verifier) continue;
-    const key = await deriveKey(password, vault.salt);
-    return {
-      session: { vaultId: keyId, key, email, workspace: vault.workspace },
-      state: await decryptState(key, vault.payload)
-    };
-  }
-
-  return null;
+function friendlyAuthError(error) {
+  const messages = {
+    "auth/email-already-in-use": "An account already exists for that email.",
+    "auth/invalid-credential": "Email or password is incorrect.",
+    "auth/weak-password": "Password must be at least 6 characters.",
+    "auth/configuration-not-found": "Enable Email/Password sign-in in Firebase Authentication.",
+    "permission-denied": "Firestore rules blocked this request."
+  };
+  return messages[error.code] || error.message || "Firebase request failed.";
 }
 
-function lock() {
+async function lock() {
+  await signOut(auth);
   session = null;
   state = null;
   selectedProjectId = null;
@@ -260,7 +267,18 @@ function lock() {
 }
 
 function render() {
+  if (authChecking) {
+    elements.authPanel.classList.add("hidden");
+    elements.workspacePanel.classList.add("hidden");
+    elements.projectPanel.classList.add("hidden");
+    elements.lockedState.classList.add("hidden");
+    elements.dashboard.classList.add("hidden");
+    elements.loadingState.classList.remove("hidden");
+    return;
+  }
+
   const unlocked = Boolean(session && state);
+  elements.loadingState.classList.add("hidden");
   elements.authPanel.classList.toggle("hidden", unlocked);
   elements.workspacePanel.classList.toggle("hidden", !unlocked);
   elements.projectPanel.classList.toggle("hidden", !unlocked);
@@ -410,19 +428,30 @@ function fillSelect(select, options, fallback) {
 async function createProject() {
   const name = await promptFor("Create project", "Project name");
   if (!name) return;
-  const envs = ["dev", "staging", "prod"].map((envName) => ({
-    id: id(),
-    name: envName,
-    variables: {},
-    versions: [],
-    createdAt: now()
-  }));
-  const project = { id: id(), name, environments: envs, createdAt: now() };
-  state.projects.unshift(project);
-  selectedProjectId = project.id;
-  selectedEnvironmentId = envs[0].id;
-  await persist("Project created.");
-  render();
+  const previousProjects = structuredClone(state.projects);
+  const previousProjectId = selectedProjectId;
+  const previousEnvironmentId = selectedEnvironmentId;
+  try {
+    const envs = ["dev", "staging", "prod"].map((envName) => ({
+      id: id(),
+      name: envName,
+      variables: {},
+      versions: [],
+      createdAt: now()
+    }));
+    const project = { id: id(), name, environments: envs, createdAt: now() };
+    state.projects.unshift(project);
+    selectedProjectId = project.id;
+    selectedEnvironmentId = envs[0].id;
+    await persist("Project created.");
+    render();
+  } catch (error) {
+    state.projects = previousProjects;
+    selectedProjectId = previousProjectId;
+    selectedEnvironmentId = previousEnvironmentId;
+    render();
+    toast(friendlyAuthError(error));
+  }
 }
 
 async function createEnvironment() {
@@ -509,22 +538,44 @@ async function importEnvFile(event) {
 
   try {
     const text = await file.text();
+    await importEnvText(text, file.name);
+  } catch (error) {
+    toast(error.message || "Could not import .env file.");
+  }
+}
+
+async function importPastedEnvText() {
+  const text = elements.envTextInput.value;
+  if (!text.trim()) {
+    toast("Paste .env text first.");
+    return;
+  }
+  await importEnvText(text, "pasted text");
+}
+
+async function importEnvText(text, sourceLabel) {
+  const environment = getEnvironment();
+  if (!environment) return;
+
+  try {
     const result = parseDotEnv(text);
     if (result.entries.length === 0) {
-      toast("No valid variables found in that file.");
+      toast("No valid variables found.");
       return;
     }
 
     const importedAt = now();
-    snapshotEnvironment(environment, `Before import ${file.name}`);
+    snapshotEnvironment(environment, `Before import from ${sourceLabel}`);
     result.entries.forEach(([key, value]) => {
       environment.variables[key] = { value, updatedAt: importedAt };
     });
 
-    await persist(`Imported ${result.entries.length} variables from ${file.name}.`);
+    elements.envTextInput.value = "";
+    elements.importDialog.close();
+    await persist(`Imported ${result.entries.length} variables from ${sourceLabel}.`);
     render();
   } catch (error) {
-    toast(error.message || "Could not import .env file.");
+    toast(error.message || "Could not import .env text.");
   }
 }
 
@@ -689,15 +740,16 @@ function promptFor(title, placeholder) {
   elements.dialogTitle.textContent = title;
   elements.dialogInput.placeholder = placeholder;
   elements.dialogInput.value = "";
-  elements.promptDialog.showModal();
-  elements.dialogInput.focus();
 
   return new Promise((resolve) => {
     const handler = () => {
       elements.promptDialog.removeEventListener("close", handler);
-      resolve(elements.promptDialog.returnValue === "ok" ? elements.dialogInput.value.trim() : "");
+      const value = elements.dialogInput.value.trim();
+      resolve(elements.promptDialog.returnValue === "cancel" ? "" : value);
     };
     elements.promptDialog.addEventListener("close", handler);
+    elements.promptDialog.showModal();
+    elements.dialogInput.focus();
   });
 }
 
@@ -724,7 +776,11 @@ elements.addEnvButton.addEventListener("click", createEnvironment);
 elements.deleteEnvButton.addEventListener("click", deleteEnvironment);
 elements.deleteProjectButton.addEventListener("click", deleteProject);
 elements.addVariableButton.addEventListener("click", () => showVariableForm());
-elements.importEnvButton.addEventListener("click", () => elements.envFileInput.click());
+elements.openHistoryButton.addEventListener("click", () => elements.historyDialog.showModal());
+elements.openDiffButton.addEventListener("click", () => elements.diffDialog.showModal());
+elements.importEnvButton.addEventListener("click", () => elements.importDialog.showModal());
+elements.chooseEnvFileButton.addEventListener("click", () => elements.envFileInput.click());
+elements.importEnvTextButton.addEventListener("click", importPastedEnvText);
 elements.envFileInput.addEventListener("change", importEnvFile);
 elements.cancelVariableButton.addEventListener("click", hideVariableForm);
 elements.variableForm.addEventListener("submit", saveVariable);
@@ -751,6 +807,47 @@ elements.variableRows.addEventListener("click", (event) => {
 elements.historyList.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (button?.dataset.action === "restore") restoreVersion(button.dataset.version);
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (authInProgress) {
+    authChecking = false;
+    return;
+  }
+  if (!user) {
+    session = null;
+    state = null;
+    authChecking = false;
+    render();
+    return;
+  }
+
+  try {
+    const loadedState = await loadUserState(user);
+    if (!loadedState) {
+      await signOut(auth);
+      session = null;
+      state = null;
+      authChecking = false;
+      render();
+      return;
+    }
+    session = {
+      uid: user.uid,
+      user,
+      email: user.email,
+      workspace: loadedState.workspace
+    };
+    state = loadedState;
+    selectedProjectId = state.projects[0]?.id || null;
+    selectedEnvironmentId = getProject()?.environments[0]?.id || null;
+    authChecking = false;
+    render();
+  } catch (error) {
+    authChecking = false;
+    render();
+    toast(friendlyAuthError(error));
+  }
 });
 
 setAuthMode("login");
