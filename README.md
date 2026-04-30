@@ -4,6 +4,10 @@ EnvX is a lightweight browser app for managing `.env` variables across projects 
 
 It uses Firebase Auth for accounts and Firestore for readable workspace data. No build step is required.
 
+## 🌐 Demo
+
+[https://envmanager-f7b92.web.app/](https://envmanager-f7b92.web.app/)
+
 ## ✨ Features
 
 - 🔐 **Firebase Auth**: email/password login, registration, confirm password, logout, and session loading state.
