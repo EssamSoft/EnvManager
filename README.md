@@ -21,7 +21,7 @@ It uses Firebase Auth for accounts and Firestore for readable workspace data. No
 1. Create a Firebase project.
 2. Enable **Authentication > Email/Password**.
 3. Create a Firestore database.
-4. Copy the example config:
+4. Update the Firebase config if you are using your own Firebase project:
 
 ```bash
 cp firebase-config.example.js firebase-config.js
@@ -29,8 +29,6 @@ cp firebase-config.example.js firebase-config.js
 
 5. Paste your Firebase web app config into `firebase-config.js`.
 6. Open `index.html` in a modern browser.
-
-`firebase-config.js` is ignored by Git so your local Firebase config is not committed.
 
 ## 🔥 Firestore Rules
 
@@ -58,6 +56,6 @@ That document contains workspace metadata, projects, environments, variables, an
 
 ## 🛡️ Security Note
 
-Firebase web config is public app configuration, not a password. Firestore security rules are what protect user data.
+Firebase web config is public app configuration, not a password. It can be committed for static hosting. Firestore security rules are what protect user data.
 
 This app stores variable values as readable Firestore data. Do not use it for highly sensitive production secrets unless that matches your security model.
