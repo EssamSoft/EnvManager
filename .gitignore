@@ -1,2 +1,4 @@
 firebase-config.js
 .DS_Store
+.firebaserc
+.firebase/*
